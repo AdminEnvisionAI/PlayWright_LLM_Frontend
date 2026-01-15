@@ -67,7 +67,6 @@ function DashboardPage() {
                     // Map qna array to results format
                     const questionResults = (promptData.qna || []).map((q, idx) => {
                         const hasAnswer = q.answer && q.answer !== 'Not available yet'
-                        console.log('QNA item:', idx, 'category_id:', q.category_id, 'category_name:', q.category_name)
                         return {
                             id: `qna-${idx}`,
                             category: q.category_name || 'General',
@@ -150,7 +149,7 @@ function DashboardPage() {
         }))
         console.log("resultToRun--->", resultToRun)
         try {
-            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'Local Area', state.promptQuestionsId, resultToRun.categoryId, resultToRun.uuid)
+            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'across country', state.promptQuestionsId, resultToRun.categoryId, resultToRun.uuid)
             const brandLower = state.analysis.brandName.toLowerCase()
             const domainLower = state.domain.toLowerCase()
             const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
@@ -178,7 +177,7 @@ function DashboardPage() {
 
         const brandLower = state.analysis.brandName.toLowerCase()
         const domainLower = state.domain.toLowerCase()
-        const locationState = state.state || 'Local Area'
+        const locationState = state.state || 'across country'
 
         setState(prev => ({ ...prev, status: 'evaluating', progress: 30 }))
 
@@ -228,7 +227,7 @@ function DashboardPage() {
         setState(prev => ({ ...prev, status: 'analyzing', progress: 5, results: [], analysis: null, promptQuestionsId: null }))
 
         try {
-            const locationState = state.state || "Local Area"
+            const locationState = state.state || 'across country'
             const analyzeResponse = await analyzeWebsite(state.domain, state.nation, locationState, state.queryContext, company?.id, projectId)
 
             const analysis = analyzeResponse.website_analysis || analyzeResponse
@@ -242,6 +241,7 @@ function DashboardPage() {
                 id: q.id,
                 category: q.category,
                 categoryId: q.category_id || null,
+                uuid: q.uuid,
                 question: q.text,
                 fullAnswer: '',
                 found: false,
@@ -468,7 +468,7 @@ function DashboardPage() {
                                 </button>
                             )}
                             {state.status === 'completed' && (
-                                <ExportButton results={state.results} filename={`${state.domain}_${state.state || 'local'}`} />
+                                <ExportButton results={state.results} filename={`${state.domain}_${state.state || 'local'}`} promptQuestionsId={state.promptQuestionsId} />
                             )}
                         </div>
                     </div>

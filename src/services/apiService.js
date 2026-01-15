@@ -54,20 +54,20 @@ export async function askChatGPT(question, nation, state, promptQuestionsId = nu
 }
 
 export async function getCompanies() {
-    const response = await fetch(`${API_BASE_URL}/companies`, { method: "POST" })
+    const response = await fetch(`${API_BASE_URL}/companies/list`, { method: "POST" })
     if (!response.ok) throw new Error('Failed to fetch companies')
     const data = await response.json()
     return data.companies
 }
 
 export async function getCompanyById(companyId) {
-    const response = await fetch(`${API_BASE_URL}/companies/${companyId}`, { method: "POST" })
+    const response = await fetch(`${API_BASE_URL}/companies/get-company/${companyId}`, { method: "POST" })
     if (!response.ok) throw new Error('Failed to fetch company')
     return response.json()
 }
 
 export async function createCompany(companyData) {
-    const response = await fetch(`${API_BASE_URL}/companies`, {
+    const response = await fetch(`${API_BASE_URL}/companies/add-company`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(companyData)
@@ -77,7 +77,7 @@ export async function createCompany(companyData) {
 }
 
 export async function deleteCompany(companyId) {
-    const response = await fetch(`${API_BASE_URL}/companies/${companyId}`, {
+    const response = await fetch(`${API_BASE_URL}/companies/delete-company/${companyId}`, {
         method: 'POST'
     })
     if (!response.ok) throw new Error('Failed to delete company')
@@ -98,7 +98,7 @@ export async function getProjectById(projectId) {
 }
 
 export async function createProject(companyId, projectData) {
-    const response = await fetch(`${API_BASE_URL}/companies/${companyId}/projects`, {
+    const response = await fetch(`${API_BASE_URL}/companies/${companyId}/add-projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(projectData)
@@ -108,7 +108,7 @@ export async function createProject(companyId, projectData) {
 }
 
 export async function deleteProject(projectId) {
-    const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+    const response = await fetch(`${API_BASE_URL}/delete-projects/${projectId}`, {
         method: 'POST'
     })
     if (!response.ok) throw new Error('Failed to delete project')
@@ -134,5 +134,18 @@ export async function getAllCategories() {
         }
     })
     if (!response.ok) throw new Error('Failed to fetch categories')
+    return response.json()
+}
+
+export async function calculateGeoMetrics(promptQuestionId) {
+    const response = await fetch(`${API_BASE_URL}/category/calculate-geo-metrics`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({ prompt_question_id: promptQuestionId })
+    })
+    if (!response.ok) throw new Error('Failed to calculate geo metrics')
     return response.json()
 }

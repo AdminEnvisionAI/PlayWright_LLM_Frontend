@@ -43,7 +43,7 @@ function App() {
         }))
 
         try {
-            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'Local Area')
+            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'across country')
             const brandLower = state.analysis.brandName.toLowerCase()
             const domainLower = state.domain.toLowerCase()
             const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
@@ -75,7 +75,7 @@ function App() {
         setState(prev => ({ ...prev, status: 'analyzing', progress: 5, results: [], analysis: null }))
 
         try {
-            const locationState = state.state || "Local Area"
+            const locationState = state.state || 'across country'
             const analysis = await analyzeWebsite(state.domain, state.nation, locationState, state.queryContext)
             setState(prev => ({ ...prev, analysis, status: 'generating', progress: 20 }))
 
