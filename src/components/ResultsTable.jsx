@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { CheckCircle2, XCircle, Search, Play, Edit2, Check, X, Loader2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Search, Play, Edit2, Check, X, Loader2, Plus, Trash2 } from 'lucide-react'
 
 function HighlightedText({ text, targetTerms }) {
     if (!text) return null
@@ -58,10 +58,12 @@ function HighlightedText({ text, targetTerms }) {
     )
 }
 
-export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onRunSingleQuestion }) {
+export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onRunSingleQuestion, onAddQuestion, onDeleteQuestion }) {
     const targetTerms = [brandName || '', domain || ''].filter(Boolean)
     const [editingId, setEditingId] = useState(null)
     const [tempText, setTempText] = useState("")
+    const [showAddForm, setShowAddForm] = useState(false)
+    const [newQuestion, setNewQuestion] = useState("")
 
     const startEditing = (id, currentText) => {
         setEditingId(id)
@@ -75,6 +77,14 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
 
     const cancelEdit = () => {
         setEditingId(null)
+    }
+
+    const handleAddQuestion = () => {
+        if (newQuestion.trim() && onAddQuestion) {
+            onAddQuestion(newQuestion.trim())
+            setNewQuestion("")
+            setShowAddForm(false)
+        }
     }
 
     return (
@@ -94,7 +104,7 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
                     <tr>
                         <th style={{ width: '8rem' }}>Category</th>
                         <th style={{ minWidth: '300px' }}>Question</th>
-                        <th>Gemini Answer</th>
+                        <th>ChatGPT Answer</th>
                         <th className="center" style={{ width: '6rem' }}>Status</th>
                         <th className="center" style={{ width: '7rem' }}>Actions</th>
                     </tr>
@@ -140,7 +150,7 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
                                     {result.loading ? (
                                         <div className="loading-answer animate-pulse">
                                             <Loader2 size={16} className="animate-spin" />
-                                            <span>Gemini is thinking...</span>
+                                            <span>ChatGPT is thinking...</span>
                                         </div>
                                     ) : result.fullAnswer ? (
                                         <HighlightedText text={result.fullAnswer} targetTerms={targetTerms} />
@@ -192,6 +202,16 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
                                     >
                                         <Play size={18} fill="currentColor" />
                                     </button>
+                                    {onDeleteQuestion && (
+                                        <button
+                                            onClick={() => onDeleteQuestion(result.id)}
+                                            className="action-btn delete"
+                                            title="Delete Question"
+                                            disabled={result.loading}
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    )}
                                 </div>
                             </td>
                         </tr>
@@ -206,6 +226,35 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
                     )}
                 </tbody>
             </table>
+            {onAddQuestion && (
+                <div className="add-question-section">
+                    {showAddForm ? (
+                        <div className="add-question-form">
+                            <textarea
+                                value={newQuestion}
+                                onChange={(e) => setNewQuestion(e.target.value)}
+                                placeholder="Enter your custom question..."
+                                className="add-question-textarea"
+                                rows={2}
+                            />
+                            <div className="add-question-actions">
+                                <button onClick={handleAddQuestion} className="btn-add-confirm" disabled={!newQuestion.trim()}>
+                                    <Plus size={16} />
+                                    Add Question
+                                </button>
+                                <button onClick={() => { setShowAddForm(false); setNewQuestion(""); }} className="btn-add-cancel">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button onClick={() => setShowAddForm(true)} className="btn-show-add-form">
+                            <Plus size={18} />
+                            Add Custom Question
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     )
 }

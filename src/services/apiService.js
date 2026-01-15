@@ -1,12 +1,12 @@
-const API_BASE_URL = '/api'
+const API_BASE_URL = 'https://c1839064b85d.ngrok-free.app/api'
 
-export async function analyzeWebsite(domain, nation, state, queryContext = "") {
+export async function analyzeWebsite(domain, nation, state, queryContext = "", companyId = null, projectId = null) {
     const response = await fetch(`${API_BASE_URL}/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ domain, nation, state, queryContext })
+        body: JSON.stringify({ domain, nation, state, queryContext, company_id: companyId, project_id: projectId })
     })
 
     if (!response.ok) {
@@ -17,13 +17,13 @@ export async function analyzeWebsite(domain, nation, state, queryContext = "") {
     return response.json()
 }
 
-export async function generateQuestions(analysis, domain, nation, state) {
+export async function generateQuestions(analysis, domain, nation, state, promptQuestionsId = null) {
     const response = await fetch(`${API_BASE_URL}/generate-questions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ analysis, domain, nation, state })
+        body: JSON.stringify({ analysis, domain, nation, state, prompt_questions_id: promptQuestionsId })
     })
 
     if (!response.ok) {
@@ -34,13 +34,14 @@ export async function generateQuestions(analysis, domain, nation, state) {
     return response.json()
 }
 
-export async function askGemini(question, nation, state) {
+
+export async function askChatGPT(question, nation, state, promptQuestionsId = null, categoryId = null) {
     const response = await fetch(`${API_BASE_URL}/ask-chatgpt`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ question, nation, state })
+        body: JSON.stringify({ question, nation, state, prompt_questions_id: promptQuestionsId, category_id: categoryId })
     })
 
     if (!response.ok) {
@@ -53,14 +54,14 @@ export async function askGemini(question, nation, state) {
 }
 
 export async function getCompanies() {
-    const response = await fetch(`${API_BASE_URL}/companies`)
+    const response = await fetch(`${API_BASE_URL}/companies`, { method: "POST" })
     if (!response.ok) throw new Error('Failed to fetch companies')
     const data = await response.json()
     return data.companies
 }
 
 export async function getCompanyById(companyId) {
-    const response = await fetch(`${API_BASE_URL}/companies/${companyId}`)
+    const response = await fetch(`${API_BASE_URL}/companies/${companyId}`, { method: "POST" })
     if (!response.ok) throw new Error('Failed to fetch company')
     return response.json()
 }
@@ -77,21 +78,21 @@ export async function createCompany(companyData) {
 
 export async function deleteCompany(companyId) {
     const response = await fetch(`${API_BASE_URL}/companies/${companyId}`, {
-        method: 'DELETE'
+        method: 'POST'
     })
     if (!response.ok) throw new Error('Failed to delete company')
     return response.json()
 }
 
 export async function getProjectsByCompany(companyId) {
-    const response = await fetch(`${API_BASE_URL}/companies/${companyId}/projects`)
+    const response = await fetch(`${API_BASE_URL}/companies/${companyId}/projects`, { method: "POST" })
     if (!response.ok) throw new Error('Failed to fetch projects')
     const data = await response.json()
     return data.projects
 }
 
 export async function getProjectById(projectId) {
-    const response = await fetch(`${API_BASE_URL}/projects/${projectId}`)
+    const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, { method: "POST" })
     if (!response.ok) throw new Error('Failed to fetch project')
     return response.json()
 }
@@ -108,8 +109,18 @@ export async function createProject(companyId, projectData) {
 
 export async function deleteProject(projectId) {
     const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
-        method: 'DELETE'
+        method: 'POST'
     })
     if (!response.ok) throw new Error('Failed to delete project')
+    return response.json()
+}
+
+export async function getPromptQuestionsData(projectId) {
+    const response = await fetch(`${API_BASE_URL}/category/get-prompt-questions-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId })
+    })
+    if (!response.ok) throw new Error('Failed to fetch prompt questions data')
     return response.json()
 }

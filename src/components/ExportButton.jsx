@@ -7,7 +7,7 @@ export function ExportButton({ results, filename }) {
         const data = results.map(r => ({
             Category: r.category,
             Question: r.question,
-            'Gemini Full Answer': r.fullAnswer,
+            'ChatGPT Full Answer': r.fullAnswer,
             'Found (True/False)': r.found ? 'TRUE' : 'FALSE'
         }))
 

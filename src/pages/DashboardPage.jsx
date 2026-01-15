@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Category } from '../constants.js'
-import { analyzeWebsite, generateQuestions, askGemini, getProjectById, getCompanyById } from '../services/apiService.js'
+import { analyzeWebsite, generateQuestions, askChatGPT, getProjectById, getCompanyById, getPromptQuestionsData } from '../services/apiService.js'
 import { ResultsTable } from '../components/ResultsTable.jsx'
 import { ExportButton } from '../components/ExportButton.jsx'
-import { Search, Globe, ShieldCheck, Loader2, AlertCircle, BarChart3, Target, LayoutDashboard, MapPin, Flag, ExternalLink, ChevronRight } from 'lucide-react'
+import { Search, Globe, ShieldCheck, Loader2, AlertCircle, BarChart3, Target, LayoutDashboard, MapPin, Flag, ExternalLink, ChevronRight, Play, Plus } from 'lucide-react'
 
 function DashboardPage() {
     const { projectId } = useParams()
@@ -20,6 +20,7 @@ function DashboardPage() {
         results: [],
         error: null,
         progress: 0,
+        promptQuestionsId: null,
     })
 
     useEffect(() => {
@@ -40,6 +41,50 @@ function DashboardPage() {
                 nation: projectData.nation || 'USA',
                 state: projectData.state || ''
             }))
+
+            // Fetch existing analyzing and questions data for this project
+            try {
+                const promptData = await getPromptQuestionsData(projectId)
+                if (promptData && promptData.chatgpt_website_analysis) {
+                    // Parse the JSON string from chatgpt_website_analysis
+                    const analysis = typeof promptData.chatgpt_website_analysis === 'string'
+                        ? JSON.parse(promptData.chatgpt_website_analysis)
+                        : promptData.chatgpt_website_analysis
+
+                    const promptQuestionsId = promptData._id || null
+
+                    // Map qna array to results format
+                    const questionResults = (promptData.qna || []).map((q, idx) => {
+                        const hasAnswer = q.answer && q.answer !== 'Not available yet'
+                        console.log('QNA item:', idx, 'category_id:', q.category_id, 'category_name:', q.category_name)
+                        return {
+                            id: `qna-${idx}`,
+                            category: q.category_name || 'General',
+                            categoryId: q.category_id,
+                            question: q.question || '',
+                            fullAnswer: hasAnswer ? q.answer : '',
+                            found: q.capture || false,
+                            loading: false
+                        }
+                    })
+
+                    // Update domain, nation, state from promptData if available
+                    setState(prev => ({
+                        ...prev,
+                        domain: promptData.website_url || prev.domain,
+                        nation: promptData.nation || prev.nation,
+                        state: promptData.state || prev.state,
+                        queryContext: promptData.context || prev.queryContext,
+                        analysis,
+                        promptQuestionsId,
+                        results: questionResults,
+                        status: questionResults.length > 0 ? (questionResults.every(q => q.fullAnswer) ? 'completed' : 'questions_ready') : 'idle',
+                        progress: 100
+                    }))
+                }
+            } catch (promptErr) {
+                console.log('No existing prompt data found for project:', promptErr.message)
+            }
         } catch (err) {
             console.error('Failed to load project:', err)
         }
@@ -60,6 +105,29 @@ function DashboardPage() {
         }))
     }
 
+    const handleAddQuestion = (questionText, category = 'Custom Question') => {
+        const newQuestion = {
+            id: `custom-${Date.now()}`,
+            category: category,
+            categoryId: null,
+            question: questionText,
+            fullAnswer: '',
+            found: false,
+            loading: false
+        }
+        setState(prev => ({
+            ...prev,
+            results: [...prev.results, newQuestion]
+        }))
+    }
+
+    const handleDeleteQuestion = (id) => {
+        setState(prev => ({
+            ...prev,
+            results: prev.results.filter(r => r.id !== id)
+        }))
+    }
+
     const handleRunSingleQuestion = async (id) => {
         const resultToRun = state.results.find(r => r.id === id)
         if (!resultToRun || !state.analysis) return
@@ -70,7 +138,7 @@ function DashboardPage() {
         }))
 
         try {
-            const answer = await askGemini(resultToRun.question, state.nation, state.state || 'Local Area')
+            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'Local Area', state.promptQuestionsId, resultToRun.categoryId)
             const brandLower = state.analysis.brandName.toLowerCase()
             const domainLower = state.domain.toLowerCase()
             const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
@@ -93,52 +161,88 @@ function DashboardPage() {
         }
     }
 
+    const handleRunAllQuestions = async () => {
+        if (!state.analysis || state.results.length === 0) return
+
+        const brandLower = state.analysis.brandName.toLowerCase()
+        const domainLower = state.domain.toLowerCase()
+        const locationState = state.state || 'Local Area'
+
+        setState(prev => ({ ...prev, status: 'evaluating', progress: 30 }))
+
+        for (let i = 0; i < state.results.length; i++) {
+            const result = state.results[i]
+            if (result.fullAnswer) continue
+
+            setState(prev => ({
+                ...prev,
+                results: prev.results.map(r => r.id === result.id ? { ...r, loading: true } : r)
+            }))
+
+            try {
+                const answer = await askChatGPT(result.question, state.nation, locationState, state.promptQuestionsId, result.categoryId)
+                const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
+
+                setState(prev => ({
+                    ...prev,
+                    results: prev.results.map(r => r.id === result.id ? {
+                        ...r,
+                        fullAnswer: answer,
+                        found,
+                        loading: false
+                    } : r)
+                }))
+            } catch (err) {
+                console.error("Question evaluation failed:", err)
+                setState(prev => ({
+                    ...prev,
+                    results: prev.results.map(r => r.id === result.id ? { ...r, loading: false } : r)
+                }))
+            }
+
+            const currentProgress = 30 + Math.floor(((i + 1) / state.results.length) * 70)
+            setState(prev => ({ ...prev, progress: currentProgress }))
+        }
+
+        setState(prev => ({ ...prev, status: 'completed', progress: 100 }))
+    }
+
     const runEvaluation = async () => {
         if (!state.domain || !state.nation) {
             setState(prev => ({ ...prev, error: "Please enter a valid domain and nation." }))
             return
         }
 
-        setState(prev => ({ ...prev, status: 'analyzing', progress: 5, results: [], analysis: null }))
+        setState(prev => ({ ...prev, status: 'analyzing', progress: 5, results: [], analysis: null, promptQuestionsId: null }))
 
         try {
             const locationState = state.state || "Local Area"
-            const analysis = await analyzeWebsite(state.domain, state.nation, locationState, state.queryContext)
-            setState(prev => ({ ...prev, analysis, status: 'generating', progress: 20 }))
+            const analyzeResponse = await analyzeWebsite(state.domain, state.nation, locationState, state.queryContext, company?.id, projectId)
 
-            const questions = await generateQuestions(analysis, state.domain, state.nation, locationState)
-            setState(prev => ({ ...prev, status: 'evaluating', progress: 30 }))
+            const analysis = analyzeResponse.website_analysis || analyzeResponse
+            const promptQuestionsId = analyzeResponse.prompt_questions_id || null
 
-            const evaluationResults = []
-            const brandLower = analysis.brandName.toLowerCase()
-            const domainLower = state.domain.toLowerCase()
+            setState(prev => ({ ...prev, analysis, promptQuestionsId, status: 'generating', progress: 20 }))
 
-            for (let i = 0; i < questions.length; i++) {
-                const q = questions[i]
-                const answer = await askGemini(q.text, state.nation, locationState)
+            const questions = await generateQuestions(analysis, state.domain, state.nation, locationState, promptQuestionsId)
 
-                const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
+            const questionResults = questions.map(q => ({
+                id: q.id,
+                category: q.category,
+                categoryId: q.category_id || null,
+                question: q.text,
+                fullAnswer: '',
+                found: false,
+                loading: false
+            }))
 
-                evaluationResults.push({
-                    id: q.id,
-                    category: q.category,
-                    question: q.text,
-                    fullAnswer: answer,
-                    found,
-                    loading: false
-                })
-
-                const currentProgress = 30 + Math.floor(((i + 1) / questions.length) * 70)
-                setState(prev => ({ ...prev, results: [...evaluationResults], progress: currentProgress }))
-            }
-
-            setState(prev => ({ ...prev, status: 'completed', progress: 100 }))
+            setState(prev => ({ ...prev, results: questionResults, status: 'questions_ready', progress: 100 }))
         } catch (err) {
-            console.error("Evaluation failed:", err)
+            console.error("Analysis failed:", err)
             setState(prev => ({
                 ...prev,
                 status: 'error',
-                error: err.message || "An unexpected error occurred during evaluation."
+                error: err.message || "An unexpected error occurred during analysis."
             }))
         }
     }
@@ -153,7 +257,9 @@ function DashboardPage() {
         }
     }, [state.results])
 
-    const isLoading = state.status !== 'idle' && state.status !== 'completed' && state.status !== 'error'
+    const isLoading = state.status !== 'idle' && state.status !== 'completed' && state.status !== 'error' && state.status !== 'questions_ready'
+    const hasUnansweredQuestions = state.results.some(r => !r.fullAnswer)
+    const isAnyLoading = state.results.some(r => r.loading)
 
     return (
         <div className="app-container">
@@ -258,7 +364,7 @@ function DashboardPage() {
 
                 {state.analysis && (
                     <div className="stats-grid animate-in">
-                        <div className="stat-card">
+                        <div className="stat-card stat-card-profile">
                             <div>
                                 <div className="stat-header">
                                     <Target size={16} />
@@ -269,11 +375,21 @@ function DashboardPage() {
                                     <MapPin size={12} />
                                     {state.state || 'Generic'}, {state.nation}
                                 </div>
-                                <p className="stat-description">{state.analysis.niche}</p>
-                                <div>
-                                    <p className="stat-label">Focus</p>
+                                <div className="stat-niche-badge">{state.analysis.niche}</div>
+                                <div className="stat-section">
+                                    <p className="stat-label">Purpose</p>
                                     <p className="stat-value-text">{state.analysis.purpose}</p>
                                 </div>
+                                {state.analysis.services && state.analysis.services.length > 0 && (
+                                    <div className="stat-section">
+                                        <p className="stat-label">Services</p>
+                                        <ul className="services-list">
+                                            {state.analysis.services.map((service, idx) => (
+                                                <li key={idx} className="service-item">{service}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -328,9 +444,21 @@ function DashboardPage() {
                             <h3 className="results-title">Authority Breakdown</h3>
                             <p className="results-subtitle">Visual logs of location-specific recommendations. You can edit and rerun individual questions.</p>
                         </div>
-                        {state.status === 'completed' && (
-                            <ExportButton results={state.results} filename={`${state.domain}_${state.state || 'local'}`} />
-                        )}
+                        <div className="results-actions">
+                            {(state.status === 'questions_ready' || state.status === 'completed' || state.status === 'evaluating') && hasUnansweredQuestions && (
+                                <button
+                                    onClick={handleRunAllQuestions}
+                                    disabled={isAnyLoading}
+                                    className="btn-run-all"
+                                >
+                                    {isAnyLoading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
+                                    Run All Questions
+                                </button>
+                            )}
+                            {state.status === 'completed' && (
+                                <ExportButton results={state.results} filename={`${state.domain}_${state.state || 'local'}`} />
+                            )}
+                        </div>
                     </div>
                     <div>
                         <ResultsTable
@@ -339,6 +467,8 @@ function DashboardPage() {
                             domain={state.domain}
                             onUpdateQuestion={handleUpdateQuestion}
                             onRunSingleQuestion={handleRunSingleQuestion}
+                            onAddQuestion={handleAddQuestion}
+                            onDeleteQuestion={handleDeleteQuestion}
                         />
                     </div>
                 </div>
@@ -350,7 +480,7 @@ function DashboardPage() {
                         </div>
                         <h2 className="welcome-title">Evaluate Your Local Authority</h2>
                         <p className="welcome-description">
-                            Find out if Gemini recommends your business in your specific region.
+                            Find out if ChatGPT recommends your business in your specific region.
                             Enter your domain and location to see how you rank against local competitors.
                         </p>
                         <div className="features-grid">

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Category } from './constants.js'
-import { analyzeWebsite, generateQuestions, askGemini } from './services/apiService.js'
+import { analyzeWebsite, generateQuestions, askChatGPT } from './services/apiService.js'
 import { ResultsTable } from './components/ResultsTable.jsx'
 import { ExportButton } from './components/ExportButton.jsx'
 import { Search, Globe, ShieldCheck, Loader2, AlertCircle, BarChart3, Target, LayoutDashboard, MapPin, Flag, ExternalLink } from 'lucide-react'
@@ -43,7 +43,7 @@ function App() {
         }))
 
         try {
-            const answer = await askGemini(resultToRun.question, state.nation, state.state || 'Local Area')
+            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'Local Area')
             const brandLower = state.analysis.brandName.toLowerCase()
             const domainLower = state.domain.toLowerCase()
             const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
@@ -88,7 +88,7 @@ function App() {
 
             for (let i = 0; i < questions.length; i++) {
                 const q = questions[i]
-                const answer = await askGemini(q.text, state.nation, locationState)
+                const answer = await askChatGPT(q.text, state.nation, locationState)
 
                 const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
 
@@ -315,7 +315,7 @@ function App() {
                         </div>
                         <h2 className="welcome-title">Evaluate Your Local Authority</h2>
                         <p className="welcome-description">
-                            Find out if Gemini recommends your business in your specific region.
+                            Find out if ChatGPT recommends your business in your specific region.
                             Enter your domain and location to see how you rank against local competitors.
                         </p>
                         <div className="features-grid">
