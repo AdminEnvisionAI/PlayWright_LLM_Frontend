@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://c1839064b85d.ngrok-free.app/api'
+const API_BASE_URL = 'https://9613cfc6e3e5.ngrok-free.app/api'
 
 export async function analyzeWebsite(domain, nation, state, queryContext = "", companyId = null, projectId = null) {
     const response = await fetch(`${API_BASE_URL}/analyze`, {
@@ -35,13 +35,13 @@ export async function generateQuestions(analysis, domain, nation, state, promptQ
 }
 
 
-export async function askChatGPT(question, nation, state, promptQuestionsId = null, categoryId = null) {
+export async function askChatGPT(question, nation, state, promptQuestionsId = null, categoryId = null, uuid = null) {
     const response = await fetch(`${API_BASE_URL}/ask-chatgpt`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ question, nation, state, prompt_questions_id: promptQuestionsId, category_id: categoryId })
+        body: JSON.stringify({ question, nation, state, prompt_questions_id: promptQuestionsId, category_id: categoryId, uuid: uuid })
     })
 
     if (!response.ok) {
@@ -122,5 +122,17 @@ export async function getPromptQuestionsData(projectId) {
         body: JSON.stringify({ project_id: projectId })
     })
     if (!response.ok) throw new Error('Failed to fetch prompt questions data')
+    return response.json()
+}
+
+export async function getAllCategories() {
+    const response = await fetch(`${API_BASE_URL}/category/get-all-category`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+        }
+    })
+    if (!response.ok) throw new Error('Failed to fetch categories')
     return response.json()
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Category } from '../constants.js'
-import { analyzeWebsite, generateQuestions, askChatGPT, getProjectById, getCompanyById, getPromptQuestionsData } from '../services/apiService.js'
+import { analyzeWebsite, generateQuestions, askChatGPT, getProjectById, getCompanyById, getPromptQuestionsData, getAllCategories } from '../services/apiService.js'
 import { ResultsTable } from '../components/ResultsTable.jsx'
 import { ExportButton } from '../components/ExportButton.jsx'
 import { Search, Globe, ShieldCheck, Loader2, AlertCircle, BarChart3, Target, LayoutDashboard, MapPin, Flag, ExternalLink, ChevronRight, Play, Plus } from 'lucide-react'
@@ -10,6 +10,7 @@ function DashboardPage() {
     const { projectId } = useParams()
     const [project, setProject] = useState(null)
     const [company, setCompany] = useState(null)
+    const [categories, setCategories] = useState([])
     const [state, setState] = useState({
         domain: '',
         nation: 'USA',
@@ -25,7 +26,17 @@ function DashboardPage() {
 
     useEffect(() => {
         loadProjectData()
+        loadCategories()
     }, [projectId])
+
+    const loadCategories = async () => {
+        try {
+            const categoriesData = await getAllCategories()
+            setCategories(categoriesData || [])
+        } catch (err) {
+            console.error('Failed to load categories:', err)
+        }
+    }
 
     const loadProjectData = async () => {
         try {
@@ -61,6 +72,7 @@ function DashboardPage() {
                             id: `qna-${idx}`,
                             category: q.category_name || 'General',
                             categoryId: q.category_id,
+                            uuid: q.uuid,
                             question: q.question || '',
                             fullAnswer: hasAnswer ? q.answer : '',
                             found: q.capture || false,
@@ -105,11 +117,11 @@ function DashboardPage() {
         }))
     }
 
-    const handleAddQuestion = (questionText, category = 'Custom Question') => {
+    const handleAddQuestion = (questionText, categoryId, categoryName = 'Custom Question') => {
         const newQuestion = {
             id: `custom-${Date.now()}`,
-            category: category,
-            categoryId: null,
+            category: categoryName,
+            categoryId: categoryId,
             question: questionText,
             fullAnswer: '',
             found: false,
@@ -136,9 +148,9 @@ function DashboardPage() {
             ...prev,
             results: prev.results.map(r => r.id === id ? { ...r, loading: true } : r)
         }))
-
+        console.log("resultToRun--->", resultToRun)
         try {
-            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'Local Area', state.promptQuestionsId, resultToRun.categoryId)
+            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'Local Area', state.promptQuestionsId, resultToRun.categoryId, resultToRun.uuid)
             const brandLower = state.analysis.brandName.toLowerCase()
             const domainLower = state.domain.toLowerCase()
             const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
@@ -180,7 +192,7 @@ function DashboardPage() {
             }))
 
             try {
-                const answer = await askChatGPT(result.question, state.nation, locationState, state.promptQuestionsId, result.categoryId)
+                const answer = await askChatGPT(result.question, state.nation, locationState, state.promptQuestionsId, result.categoryId, result.uuid)
                 const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
 
                 setState(prev => ({
@@ -469,6 +481,7 @@ function DashboardPage() {
                             onRunSingleQuestion={handleRunSingleQuestion}
                             onAddQuestion={handleAddQuestion}
                             onDeleteQuestion={handleDeleteQuestion}
+                            categories={categories}
                         />
                     </div>
                 </div>

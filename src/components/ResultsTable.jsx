@@ -58,12 +58,13 @@ function HighlightedText({ text, targetTerms }) {
     )
 }
 
-export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onRunSingleQuestion, onAddQuestion, onDeleteQuestion }) {
+export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onRunSingleQuestion, onAddQuestion, onDeleteQuestion, categories = [] }) {
     const targetTerms = [brandName || '', domain || ''].filter(Boolean)
     const [editingId, setEditingId] = useState(null)
     const [tempText, setTempText] = useState("")
     const [showAddForm, setShowAddForm] = useState(false)
     const [newQuestion, setNewQuestion] = useState("")
+    const [selectedCategoryId, setSelectedCategoryId] = useState("")
 
     const startEditing = (id, currentText) => {
         setEditingId(id)
@@ -80,9 +81,12 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
     }
 
     const handleAddQuestion = () => {
-        if (newQuestion.trim() && onAddQuestion) {
-            onAddQuestion(newQuestion.trim())
+        if (newQuestion.trim() && selectedCategoryId && onAddQuestion) {
+            const selectedCategory = categories.find(cat => cat._id === selectedCategoryId)
+            const categoryName = selectedCategory ? selectedCategory.name : 'Custom Question'
+            onAddQuestion(newQuestion.trim(), selectedCategoryId, categoryName)
             setNewQuestion("")
+            setSelectedCategoryId("")
             setShowAddForm(false)
         }
     }
@@ -230,6 +234,21 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
                 <div className="add-question-section">
                     {showAddForm ? (
                         <div className="add-question-form">
+                            <div className="add-question-category-select">
+                                <label className="category-select-label">Select Category:</label>
+                                <select
+                                    value={selectedCategoryId}
+                                    onChange={(e) => setSelectedCategoryId(e.target.value)}
+                                    className="category-dropdown"
+                                >
+                                    <option value="">-- Choose a Category --</option>
+                                    {categories.map(cat => (
+                                        <option key={cat._id} value={cat._id}>
+                                            {cat.name} - {cat.description}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                             <textarea
                                 value={newQuestion}
                                 onChange={(e) => setNewQuestion(e.target.value)}
@@ -238,11 +257,11 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
                                 rows={2}
                             />
                             <div className="add-question-actions">
-                                <button onClick={handleAddQuestion} className="btn-add-confirm" disabled={!newQuestion.trim()}>
+                                <button onClick={handleAddQuestion} className="btn-add-confirm" disabled={!newQuestion.trim() || !selectedCategoryId}>
                                     <Plus size={16} />
                                     Add Question
                                 </button>
-                                <button onClick={() => { setShowAddForm(false); setNewQuestion(""); }} className="btn-add-cancel">
+                                <button onClick={() => { setShowAddForm(false); setNewQuestion(""); setSelectedCategoryId(""); }} className="btn-add-cancel">
                                     Cancel
                                 </button>
                             </div>
