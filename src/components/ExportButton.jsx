@@ -1,42 +1,57 @@
 import React, { useState } from 'react'
 import * as XLSX from 'xlsx'
 import { Download, Loader2 } from 'lucide-react'
-import { calculateGeoMetrics } from '../services/apiService.js'
 
-export function ExportButton({ results, filename, promptQuestionsId }) {
+export function ExportButton({ results, filename, geoMetrics }) {
     const [isExporting, setIsExporting] = useState(false)
 
     const generateConclusions = (metrics) => {
         const conclusions = []
+        const brandAgnostic = metrics.brand_agnostic_metrics || {}
+        const brandIncluded = metrics.brand_included_metrics || {}
+        const brandName = metrics.brand_name || 'Brand'
 
-        // Brand Mention Analysis
-        if (metrics.brand_mention_rate >= 50) {
-            conclusions.push(`✅ Strong Brand Visibility: ${metrics.brand_name} is mentioned in ${metrics.brand_mention_rate}% of prompts, indicating good AI recognition.`)
-        } else if (metrics.brand_mention_rate >= 25) {
-            conclusions.push(`⚠️ Moderate Brand Visibility: ${metrics.brand_name} appears in ${metrics.brand_mention_rate}% of prompts. There's room for improvement in AI recommendations.`)
+        // Brand Agnostic Mention Analysis (Organic Discovery)
+        if (brandAgnostic.brand_mention_rate >= 50) {
+            conclusions.push(`✅ Strong Organic Visibility: ${brandName} is organically mentioned in ${brandAgnostic.brand_mention_rate}% of generic prompts (without brand name), indicating excellent AI recognition.`)
+        } else if (brandAgnostic.brand_mention_rate >= 25) {
+            conclusions.push(`⚠️ Moderate Organic Visibility: ${brandName} appears in ${brandAgnostic.brand_mention_rate}% of generic prompts. There's room for improvement in organic AI recommendations.`)
+        } else if (brandAgnostic.brand_mention_rate > 0) {
+            conclusions.push(`⚠️ Low Organic Visibility: ${brandName} only appears in ${brandAgnostic.brand_mention_rate}% of generic prompts. SEO and content optimization needed.`)
         } else {
-            conclusions.push(`❌ Low Brand Visibility: ${metrics.brand_name} only appears in ${metrics.brand_mention_rate}% of prompts. Significant SEO and content optimization needed.`)
+            conclusions.push(`❌ No Organic Visibility: ${brandName} is not appearing in any generic prompts (0% organic mention rate). Immediate action required for AI visibility.`)
         }
 
-        // Top 3 Position Analysis
-        if (metrics.top_3_position_rate >= 50) {
-            conclusions.push(`✅ Excellent Positioning: Brand appears in top 3 recommendations ${metrics.top_3_position_rate}% of the time.`)
-        } else if (metrics.top_3_position_rate > 0) {
-            conclusions.push(`⚠️ Average Positioning: Brand achieves top 3 position only ${metrics.top_3_position_rate}% of the time. Consider strengthening unique value propositions.`)
+        // Top 3 Position Analysis (Brand Agnostic)
+        if (brandAgnostic.top_3_position_rate >= 50) {
+            conclusions.push(`✅ Excellent Organic Positioning: Brand appears in top 3 recommendations ${brandAgnostic.top_3_position_rate}% of the time in generic searches.`)
+        } else if (brandAgnostic.top_3_position_rate > 0) {
+            conclusions.push(`⚠️ Average Organic Positioning: Brand achieves top 3 position only ${brandAgnostic.top_3_position_rate}% of the time in generic searches.`)
         } else {
-            conclusions.push(`❌ Poor Positioning: Brand never appears in top 3 recommendations. Focus on differentiating factors and local SEO.`)
+            conclusions.push(`❌ Poor Organic Positioning: Brand never appears in top 3 for generic searches. Focus on differentiating factors and local SEO.`)
         }
 
-        // Sentiment Analysis
-        if (metrics.positive_sentiment_rate >= 80) {
-            conclusions.push(`✅ Positive Brand Perception: ${metrics.positive_sentiment_rate}% positive sentiment indicates strong reputation.`)
-        } else if (metrics.positive_sentiment_rate >= 50) {
-            conclusions.push(`⚠️ Mixed Sentiment: ${metrics.positive_sentiment_rate}% positive sentiment. Address customer feedback and improve service quality.`)
+        // Positive Sentiment Analysis (from Brand Included - meaningful when brand is mentioned)
+        if (brandIncluded.positive_sentiment_rate >= 80) {
+            conclusions.push(`✅ Positive Brand Perception: ${brandIncluded.positive_sentiment_rate}% positive sentiment when brand is mentioned, indicating strong reputation.`)
+        } else if (brandIncluded.positive_sentiment_rate >= 50) {
+            conclusions.push(`⚠️ Mixed Sentiment: ${brandIncluded.positive_sentiment_rate}% positive sentiment. Address customer feedback and improve service quality.`)
+        } else if (brandIncluded.positive_sentiment_rate > 0) {
+            conclusions.push(`⚠️ Low Sentiment: Only ${brandIncluded.positive_sentiment_rate}% positive sentiment. Review AI responses for improvement areas.`)
         }
 
-        // Zero Mention Analysis
-        if (metrics.zero_mention_count > 0) {
-            conclusions.push(`📊 Opportunity Areas: ${metrics.zero_mention_count} prompts where brand wasn't mentioned. Review these prompts to identify content gaps.`)
+        // Zero Mention Analysis (Brand Agnostic)
+        if (brandAgnostic.zero_mention_count > 0) {
+            conclusions.push(`📊 Opportunity Areas: ${brandAgnostic.zero_mention_count} generic prompts where brand wasn't mentioned organically. Review these prompts to identify content gaps.`)
+        } else if (brandAgnostic.total_prompts > 0) {
+            conclusions.push(`🎉 Perfect Organic Coverage: Brand was mentioned in all ${brandAgnostic.total_prompts} generic prompts!`)
+        }
+
+        // Recommendation Rate (Brand Agnostic)
+        if (brandAgnostic.recommendation_rate >= 50) {
+            conclusions.push(`✅ High Recommendation Rate: ${brandAgnostic.recommendation_rate}% recommendation rate in organic searches.`)
+        } else if (brandAgnostic.recommendation_rate > 0) {
+            conclusions.push(`⚠️ Low Recommendation Rate: Only ${brandAgnostic.recommendation_rate}% recommendation rate in organic searches. Improve brand perception.`)
         }
 
         // Competitor Analysis
@@ -45,83 +60,180 @@ export function ExportButton({ results, filename, promptQuestionsId }) {
             conclusions.push(`🔍 Competitive Landscape: ${competitorCount} competitors identified in AI responses. Analyze their strengths for improvement opportunities.`)
         }
 
-        // Brand Features
+        // Brand Features (limited to first 10)
         if (metrics.brand_features && metrics.brand_features.length > 0) {
-            conclusions.push(`💡 Key Differentiators: Your brand is recognized for: ${metrics.brand_features.join(', ')}.`)
+            const topFeatures = metrics.brand_features.slice(0, 10).join(', ')
+            conclusions.push(`💡 Key Differentiators: Your brand is recognized for: ${topFeatures}.`)
         }
 
-        // Overall Recommendation
-        if (metrics.brand_mention_rate >= 50 && metrics.positive_sentiment_rate >= 70) {
-            conclusions.push(`🎯 Overall: ${metrics.brand_name} has strong AI visibility. Continue current strategies and focus on maintaining consistency.`)
-        } else if (metrics.brand_mention_rate >= 25) {
-            conclusions.push(`🎯 Overall: ${metrics.brand_name} has potential but needs targeted improvements in content and local SEO optimization.`)
+        // Overall Recommendation based on Brand Agnostic metrics
+        if (brandAgnostic.brand_mention_rate >= 50) {
+            conclusions.push(`🎯 Overall: ${brandName} has strong organic AI visibility. Continue current strategies and focus on maintaining consistency.`)
+        } else if (brandAgnostic.brand_mention_rate >= 25) {
+            conclusions.push(`🎯 Overall: ${brandName} has potential but needs targeted improvements in content and local SEO optimization for better organic discovery.`)
         } else {
-            conclusions.push(`🎯 Overall: Immediate action required to improve ${metrics.brand_name}'s AI visibility. Focus on structured data, local citations, and content strategy.`)
+            conclusions.push(`🎯 Overall: Immediate action required to improve ${brandName}'s organic AI visibility. Focus on structured data, local citations, and content strategy.`)
         }
 
         return conclusions
     }
 
     const handleExport = async () => {
+        if (!geoMetrics) {
+            alert('Metrics data not available. Please wait for analysis to complete.')
+            return
+        }
+
         setIsExporting(true)
 
         try {
-            // Fetch geo metrics from API
-            const metrics = await calculateGeoMetrics(promptQuestionsId)
+            // Use geoMetrics prop instead of fetching
+            const metrics = geoMetrics
             const conclusions = generateConclusions(metrics)
 
             const workbook = XLSX.utils.book_new()
 
-            // Sheet 1: Executive Summary
+            // Sheet 1: AEO_GEO_Prompt_Tracking - Questions grouped by category
+            const promptTrackingData = [
+                ['Category', 'Prompt', 'Platform (ChatGPT)', 'Mentions', 'Rank (0-2)', 'Description', 'Intent Match', 'Conversion', 'Total Score', 'Notes'],
+            ]
+
+            // Group results by category
+            const allPrompts = [...results]
+            const groupedByCategory = allPrompts.reduce((acc, r) => {
+                const cat = r.category || 'Uncategorized'
+                if (!acc[cat]) acc[cat] = []
+                acc[cat].push(r)
+                return acc
+            }, {})
+
+            // Add prompts grouped by category
+            Object.entries(groupedByCategory).sort((a, b) => a[0].localeCompare(b[0])).forEach(([category, items]) => {
+                items.forEach(r => {
+                    const mentions = r.found ? 1 : 0
+                    const rank = r.found ? 1 : 'NA'
+                    const description = r.fullAnswer ? r.fullAnswer.substring(0, 100) + '...' : ''
+                    const intentMatch = r.fullAnswer ? (r.found ? 1 : 0) : 'NA'
+                    const conversion = r.found ? 1 : 0
+                    const totalScore = r.found ? (mentions + (typeof rank === 'number' ? rank : 0) + intentMatch + conversion) : 0
+
+                    let notes = ''
+                    if (!r.found) {
+                        notes = 'No mention'
+                    } else if (r.fullAnswer && r.fullAnswer.toLowerCase().includes('not recommended')) {
+                        notes = 'not recommended, Competition recommend.'
+                    } else if (r.fullAnswer && r.fullAnswer.toLowerCase().includes('negative')) {
+                        notes = 'Negative review from regulatory.'
+                    }
+
+                    promptTrackingData.push([
+                        category,
+                        r.question || '',
+                        '',
+                        mentions,
+                        rank,
+                        description,
+                        intentMatch,
+                        conversion,
+                        totalScore,
+                        notes
+                    ])
+                })
+            })
+
+            const promptTrackingSheet = XLSX.utils.aoa_to_sheet(promptTrackingData)
+            promptTrackingSheet['!cols'] = [
+                { wch: 15 },  // Category
+                { wch: 55 },  // Prompt
+                { wch: 15 },  // Platform
+                { wch: 10 },  // Mentions
+                { wch: 10 },  // Rank
+                { wch: 40 },  // Description
+                { wch: 12 },  // Intent Match
+                { wch: 12 },  // Conversion
+                { wch: 12 },  // Total Score
+                { wch: 50 },  // Notes
+            ]
+            XLSX.utils.book_append_sheet(workbook, promptTrackingSheet, 'AEO_GEO_Prompt_Tracking')
+
+            // Sheet 2: Executive Summary - Brand Info + Brand Agnostic Metrics + Features
+            const brandAgnostic = metrics.brand_agnostic_metrics || {}
+            const brandIncluded = metrics.brand_included_metrics || {}
             const summaryData = [
                 ['BRAND PERFORMANCE REPORT'],
                 [''],
-                ['Brand Name', metrics.brand_name],
+                ['BRAND INFORMATION'],
+                ['Brand Name', metrics.brand_name || ''],
+                ['Total Prompts (Overall)', metrics.total_prompts || 0],
+                ['Total Prompts (Brand Agnostic)', brandAgnostic.total_prompts || 0],
                 ['Report Generated', new Date().toLocaleString()],
                 [''],
-                ['KEY METRICS'],
-                ['Total Prompts Analyzed', metrics.total_prompts],
-                ['Total Brand Mentions', metrics.total_mentions],
-                ['Brand Mention Rate', `${metrics.brand_mention_rate}%`],
-                ['Top 3 Position Rate', `${metrics.top_3_position_rate}%`],
-                ['Recommendation Rate', `${metrics.recommendation_rate}%`],
-                ['Positive Sentiment Rate', `${metrics.positive_sentiment_rate}%`],
-                ['First Party Citations', metrics.first_party_citations],
-                ['First Party Citation Rate', `${metrics.first_party_citation_rate}%`],
-                [''],
-                ['BRAND FEATURES RECOGNIZED'],
-                ...(metrics.brand_features || []).map(f => [f]),
-                [''],
-                ['CONCLUSIONS & RECOMMENDATIONS'],
-                ...conclusions.map(c => [c]),
-            ]
-            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
-            summarySheet['!cols'] = [{ wch: 80 }, { wch: 40 }]
-            // Style for header
-            summarySheet['A1'] = { v: 'BRAND PERFORMANCE REPORT', t: 's', s: { font: { bold: true, sz: 16 } } }
-            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Executive Summary')
-
-            // Sheet 2: Metrics Analysis
-            const metricsData = [
-                ['DETAILED METRICS ANALYSIS'],
+                ['═══════════════════════════════════════════════════════════════'],
+                ['BRAND AGNOSTIC METRICS (Organic Discovery - Without Brand Name)'],
+                ['═══════════════════════════════════════════════════════════════'],
                 [''],
                 ['Metric', 'Value', 'Status'],
-                ['Total Prompts', metrics.total_prompts, 'Baseline'],
-                ['Total Mentions', metrics.total_mentions, metrics.total_mentions > 0 ? '✓ Good' : '✗ Needs Work'],
-                ['Brand Mention Rate', `${metrics.brand_mention_rate}%`, metrics.brand_mention_rate >= 50 ? '✓ Excellent' : metrics.brand_mention_rate >= 25 ? '⚠ Moderate' : '✗ Low'],
-                ['Top 3 Mentions', metrics.top_3_mentions, metrics.top_3_mentions > 0 ? '✓ Good' : '✗ Not in Top 3'],
-                ['Top 3 Position Rate', `${metrics.top_3_position_rate}%`, metrics.top_3_position_rate >= 50 ? '✓ Excellent' : '⚠ Needs Improvement'],
-                ['Zero Mention Count', metrics.zero_mention_count, metrics.zero_mention_count === 0 ? '✓ Perfect' : `⚠ ${metrics.zero_mention_count} Opportunities`],
-                ['Recommendation Rate', `${metrics.recommendation_rate}%`, metrics.recommendation_rate >= 50 ? '✓ Good' : '⚠ Low'],
-                ['Positive Sentiment', `${metrics.positive_sentiment_rate}%`, metrics.positive_sentiment_rate >= 80 ? '✓ Excellent' : '⚠ Mixed'],
-                ['Comparison Presence', metrics.comparison_presence, ''],
-                ['Using LLM Flags', metrics.using_llm_flags ? 'Yes' : 'No', ''],
-            ]
-            const metricsSheet = XLSX.utils.aoa_to_sheet(metricsData)
-            metricsSheet['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 25 }]
-            XLSX.utils.book_append_sheet(workbook, metricsSheet, 'Metrics Analysis')
+                ['Total Prompts', brandAgnostic.total_prompts || 0, 'Baseline'],
+                ['Mentions', brandAgnostic.mentions || 0, brandAgnostic.mentions > 0 ? '✓ Found' : '✗ Not Found'],
+                ['Brand Mention Rate', `${brandAgnostic.brand_mention_rate || 0}%`, brandAgnostic.brand_mention_rate >= 50 ? '✓ Excellent' : brandAgnostic.brand_mention_rate > 0 ? '⚠ Moderate' : '✗ Not Visible'],
+                ['Top 3 Mentions', brandAgnostic.top_3_mentions || 0, brandAgnostic.top_3_mentions > 0 ? '✓ Good' : '✗ Not in Top 3'],
+                ['Top 3 Position Rate', `${brandAgnostic.top_3_position_rate || 0}%`, brandAgnostic.top_3_position_rate >= 50 ? '✓ Excellent' : '⚠ Needs Improvement'],
+                ['Recommendation Rate', `${brandAgnostic.recommendation_rate || 0}%`, brandAgnostic.recommendation_rate >= 50 ? '✓ Good' : '⚠ Low'],
+                ['Zero Mention Count', brandAgnostic.zero_mention_count || 0, brandAgnostic.zero_mention_count === 0 ? '✓ Perfect' : `⚠ ${brandAgnostic.zero_mention_count} Opportunities`],
+                ['Citations Expected', brandAgnostic.citations_expected || 0, ''],
+                ['First Party Citations', brandAgnostic.first_party_citations || 0, ''],
+                ['First Party Citation Rate', `${brandAgnostic.first_party_citation_rate || 0}%`, ''],
+                [''],
+                ['═══════════════════════════════════════════════════════════════'],
+                ['BRAND INCLUDED METRICS (Sentiment from branded queries)'],
+                ['═══════════════════════════════════════════════════════════════'],
+                [''],
+                ['Positive Sentiment Rate', `${brandIncluded.positive_sentiment_rate || 0}%`, brandIncluded.positive_sentiment_rate >= 80 ? '✓ Excellent' : brandIncluded.positive_sentiment_rate >= 50 ? '⚠ Mixed' : '⚠ Low'],
+                [''],
+                ['═══════════════════════════════════════════════════════════════'],
+                ['BRAND FEATURES (Recognized by AI)'],
+                ['═══════════════════════════════════════════════════════════════'],
+                [''],
+                ...(metrics.brand_features || []).slice(0, 50).map((f, idx) => [`${idx + 1}. ${f}`]),
+                metrics.brand_features && metrics.brand_features.length > 50 ? [`... and ${metrics.brand_features.length - 50} more features`] : [],
+                [''],
+                ['═══════════════════════════════════════════════════════════════'],
+                ['CONCLUSIONS & RECOMMENDATIONS'],
+                ['═══════════════════════════════════════════════════════════════'],
+                [''],
+                ...conclusions.map(c => [c]),
+            ].filter(row => row.length > 0)
 
-            // Sheet 3: Competitor Analysis
+            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
+            summarySheet['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 25 }]
+            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Executive Summary')
+
+            // Sheet 3: Zero Mention Prompts (Brand Agnostic - Opportunities)
+            const zeroMentionData = [
+                ['IMPROVEMENT OPPORTUNITIES'],
+                ['(Brand Agnostic Prompts - where brand was NOT mentioned organically)'],
+                [''],
+                ['#', 'Question', 'Answer Snippet', 'Category'],
+            ]
+
+            if (brandAgnostic.zero_mention_prompts && brandAgnostic.zero_mention_prompts.length > 0) {
+                brandAgnostic.zero_mention_prompts.forEach((p, idx) => {
+                    zeroMentionData.push([
+                        idx + 1,
+                        p.question || '',
+                        p.answer_snippet || '',
+                        p.category_name || ''
+                    ])
+                })
+            } else {
+                zeroMentionData.push(['', '🎉 No zero mention prompts found - Brand is visible organically!', '', ''])
+            }
+
+            const zeroMentionSheet = XLSX.utils.aoa_to_sheet(zeroMentionData)
+            zeroMentionSheet['!cols'] = [{ wch: 5 }, { wch: 60 }, { wch: 80 }, { wch: 20 }]
+            XLSX.utils.book_append_sheet(workbook, zeroMentionSheet, 'Zero Mention Prompts')
+
+            // Sheet 4: Competitor Analysis
             const competitorEntries = Object.entries(metrics.competitor_mentions || {})
             const competitorData = [
                 ['COMPETITOR ANALYSIS'],
@@ -130,34 +242,10 @@ export function ExportButton({ results, filename, promptQuestionsId }) {
                 ...(competitorEntries.length > 0
                     ? competitorEntries.sort((a, b) => b[1] - a[1]).map(([name, count]) => [name, count])
                     : [['No competitors identified in responses', '']]),
-                [''],
-                ['Analysis Notes'],
-                [competitorEntries.length > 0
-                    ? `${competitorEntries.length} competitors were mentioned in AI responses. Focus on differentiating your brand from these competitors.`
-                    : 'No direct competitors were mentioned. This could indicate a niche market or need for broader keyword targeting.'],
             ]
             const competitorSheet = XLSX.utils.aoa_to_sheet(competitorData)
             competitorSheet['!cols'] = [{ wch: 40 }, { wch: 20 }]
             XLSX.utils.book_append_sheet(workbook, competitorSheet, 'Competitor Analysis')
-
-            // Sheet 4: Zero Mention Prompts (Opportunities)
-            const zeroMentionData = [
-                ['IMPROVEMENT OPPORTUNITIES'],
-                ['(Prompts where brand was NOT mentioned)'],
-                [''],
-                ['Question', 'Answer Snippet', 'Category'],
-                ...(metrics.zero_mention_prompts || []).map(p => [
-                    p.question,
-                    p.answer_snippet,
-                    p.category_name
-                ]),
-            ]
-            if ((metrics.zero_mention_prompts || []).length === 0) {
-                zeroMentionData.push(['🎉 Congratulations! Brand was mentioned in all prompts.', '', ''])
-            }
-            const zeroMentionSheet = XLSX.utils.aoa_to_sheet(zeroMentionData)
-            zeroMentionSheet['!cols'] = [{ wch: 60 }, { wch: 80 }, { wch: 20 }]
-            XLSX.utils.book_append_sheet(workbook, zeroMentionSheet, 'Zero Mention Prompts')
 
             // Sheet 5: All Q&A Data - Organized by Category
             const qnaData = [
@@ -165,16 +253,8 @@ export function ExportButton({ results, filename, promptQuestionsId }) {
                 [''],
             ]
 
-            // Group results by category
-            const groupedByCategory = results.reduce((acc, r) => {
-                const cat = r.category || 'Uncategorized'
-                if (!acc[cat]) acc[cat] = []
-                acc[cat].push(r)
-                return acc
-            }, {})
-
             // Add category-wise sections
-            Object.entries(groupedByCategory).forEach(([category, items]) => {
+            Object.entries(groupedByCategory).sort((a, b) => a[0].localeCompare(b[0])).forEach(([category, items]) => {
                 const foundCount = items.filter(i => i.found).length
                 const totalCount = items.length
                 const foundRate = totalCount > 0 ? Math.round((foundCount / totalCount) * 100) : 0

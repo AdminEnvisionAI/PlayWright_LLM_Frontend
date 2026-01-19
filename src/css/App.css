@@ -636,6 +636,123 @@ body {
     font-style: italic;
 }
 
+/* --- Geo Metrics Grid --- */
+.geo-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (min-width: 640px) {
+    .geo-metrics-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.geo-metric-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.geo-metric-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-main);
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+.geo-metric-label {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+    margin-top: 0.25rem;
+}
+
+/* --- Brand Features Section --- */
+.brand-features-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.brand-features-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.brand-feature-tag {
+    background: rgba(168, 85, 247, 0.1);
+    color: var(--neon-purple);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 500;
+}
+
+.brand-feature-etc {
+    background: rgba(148, 163, 184, 0.1);
+    color: var(--text-muted);
+    border-color: rgba(148, 163, 184, 0.2);
+    font-style: italic;
+}
+
+/* --- Service Etc --- */
+.service-etc {
+    background: rgba(148, 163, 184, 0.1);
+    color: var(--text-muted);
+    border-color: rgba(148, 163, 184, 0.2);
+    font-style: italic;
+}
+
+/* --- Brand Agnostic Metrics Section --- */
+.brand-agnostic-section {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: rgba(14, 165, 233, 0.05);
+    border: 1px solid rgba(14, 165, 233, 0.15);
+}
+
+.agnostic-label {
+    color: var(--neon-blue) !important;
+    font-size: 0.7rem !important;
+    margin-bottom: 0.5rem;
+}
+
+.agnostic-grid {
+    margin-top: 0.5rem !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+}
+
+.agnostic-item {
+    background: rgba(14, 165, 233, 0.08) !important;
+    border-color: rgba(14, 165, 233, 0.15) !important;
+}
+
+.agnostic-item .geo-metric-value {
+    color: var(--neon-blue);
+    font-size: 1rem;
+}
+
+.agnostic-item .geo-metric-label {
+    color: var(--text-muted);
+    font-size: 0.55rem;
+}
+
 /* --- Status Container --- */
 .status-container {
     display: flex;
@@ -765,6 +882,34 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
     filter: grayscale(100%);
+}
+
+/* --- Calculate Metrics Button --- */
+.btn-calculate-metrics {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, var(--neon-amber), #d97706);
+    color: white;
+    padding: 0.625rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+}
+
+.btn-calculate-metrics:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(245, 158, 11, 0.4);
+}
+
+.btn-calculate-metrics:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 
 .category-tags {

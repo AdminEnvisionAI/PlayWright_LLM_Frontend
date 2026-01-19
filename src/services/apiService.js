@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://9613cfc6e3e5.ngrok-free.app/api'
+const API_BASE_URL = 'https://f912f79e3361.ngrok-free.app/api'
 
 export async function analyzeWebsite(domain, nation, state, queryContext = "", companyId = null, projectId = null) {
     const response = await fetch(`${API_BASE_URL}/analyze`, {
@@ -134,6 +134,19 @@ export async function getAllCategories() {
         }
     })
     if (!response.ok) throw new Error('Failed to fetch categories')
+    return response.json()
+}
+
+export async function getGeneratedMetrics(promptQuestionId) {
+    const response = await fetch(`${API_BASE_URL}/category/get-genrated-metrics`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify({ prompt_question_id: promptQuestionId })
+    })
+    if (!response.ok) throw new Error('Failed to get generated metrics')
     return response.json()
 }
 

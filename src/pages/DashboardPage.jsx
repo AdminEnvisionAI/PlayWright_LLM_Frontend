@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Category } from '../constants.js'
-import { analyzeWebsite, generateQuestions, askChatGPT, getProjectById, getCompanyById, getPromptQuestionsData, getAllCategories } from '../services/apiService.js'
+import { analyzeWebsite, generateQuestions, askChatGPT, getProjectById, getCompanyById, getPromptQuestionsData, getAllCategories, getGeneratedMetrics, calculateGeoMetrics } from '../services/apiService.js'
 import { ResultsTable } from '../components/ResultsTable.jsx'
 import { ExportButton } from '../components/ExportButton.jsx'
-import { Search, Globe, ShieldCheck, Loader2, AlertCircle, BarChart3, Target, LayoutDashboard, MapPin, Flag, ExternalLink, ChevronRight, Play, Plus } from 'lucide-react'
+import { Search, Globe, ShieldCheck, Loader2, AlertCircle, BarChart3, Target, LayoutDashboard, MapPin, Flag, ExternalLink, ChevronRight, Play, Plus, Calculator } from 'lucide-react'
 
 function DashboardPage() {
     const { projectId } = useParams()
@@ -22,6 +22,9 @@ function DashboardPage() {
         error: null,
         progress: 0,
         promptQuestionsId: null,
+        geoMetrics: null,
+        metricsChecked: false,
+        isCalculatingMetrics: false,
     })
 
     useEffect(() => {
@@ -98,6 +101,49 @@ function DashboardPage() {
             }
         } catch (err) {
             console.error('Failed to load project:', err)
+        }
+    }
+
+    // Fetch geo metrics when status becomes completed
+    // Only check for pre-generated metrics, don't auto-calculate
+    useEffect(() => {
+        const checkGeneratedMetrics = async () => {
+            if (state.status === 'completed' && state.promptQuestionsId && !state.metricsChecked) {
+                try {
+                    // Try to get pre-generated metrics
+                    const generatedMetrics = await getGeneratedMetrics(state.promptQuestionsId)
+
+                    // Check if metrics data exists (has brand_name or total_prompts)
+                    if (generatedMetrics && (generatedMetrics.brand_name || generatedMetrics.total_prompts)) {
+                        console.log('Using pre-generated metrics')
+                        setState(prev => ({ ...prev, geoMetrics: generatedMetrics, metricsChecked: true }))
+                    } else {
+                        // No pre-generated metrics, user needs to click Calculate button
+                        console.log('No pre-generated metrics found')
+                        setState(prev => ({ ...prev, metricsChecked: true }))
+                    }
+                } catch (err) {
+                    console.error('Failed to get generated metrics:', err)
+                    setState(prev => ({ ...prev, metricsChecked: true }))
+                }
+            }
+        }
+        checkGeneratedMetrics()
+    }, [state.status, state.promptQuestionsId])
+
+    // Handle Calculate Metrics button click
+    const handleCalculateMetrics = async () => {
+        if (!state.promptQuestionsId) return
+
+        setState(prev => ({ ...prev, isCalculatingMetrics: true }))
+
+        try {
+            const calculatedMetrics = await calculateGeoMetrics(state.promptQuestionsId)
+            setState(prev => ({ ...prev, geoMetrics: calculatedMetrics, isCalculatingMetrics: false }))
+        } catch (err) {
+            console.error('Failed to calculate geo metrics:', err)
+            setState(prev => ({ ...prev, isCalculatingMetrics: false }))
+            alert('Failed to calculate metrics. Please try again.')
         }
     }
 
@@ -396,9 +442,12 @@ function DashboardPage() {
                                     <div className="stat-section">
                                         <p className="stat-label">Services</p>
                                         <ul className="services-list">
-                                            {state.analysis.services.map((service, idx) => (
+                                            {state.analysis.services.slice(0, 10).map((service, idx) => (
                                                 <li key={idx} className="service-item">{service}</li>
                                             ))}
+                                            {state.analysis.services.length > 10 && (
+                                                <li className="service-item service-etc">...etc.</li>
+                                            )}
                                         </ul>
                                     </div>
                                 )}
@@ -420,6 +469,50 @@ function DashboardPage() {
                                     style={{ width: `${stats.score}%` }}
                                 />
                             </div>
+                            {state.geoMetrics?.brand_agnostic_metrics && (
+                                <div className="brand-agnostic-section">
+                                    <p className="stat-label agnostic-label">🔍 Brand Agnostic Metrics (Organic Discovery)</p>
+                                    <div className="geo-metrics-grid agnostic-grid">
+                                        <div className="geo-metric-item agnostic-item">
+                                            <span className="geo-metric-value">{state.geoMetrics.brand_agnostic_metrics.total_prompts}</span>
+                                            <span className="geo-metric-label">Total Prompts</span>
+                                        </div>
+                                        <div className="geo-metric-item agnostic-item">
+                                            <span className="geo-metric-value">{state.geoMetrics.brand_agnostic_metrics.mentions}</span>
+                                            <span className="geo-metric-label">Mentions</span>
+                                        </div>
+                                        <div className="geo-metric-item agnostic-item">
+                                            <span className="geo-metric-value">{state.geoMetrics.brand_agnostic_metrics.brand_mention_rate?.toFixed(1)}%</span>
+                                            <span className="geo-metric-label">Mention Rate</span>
+                                        </div>
+                                        <div className="geo-metric-item agnostic-item">
+                                            <span className="geo-metric-value">{state.geoMetrics.brand_agnostic_metrics.top_3_position_rate?.toFixed(1)}%</span>
+                                            <span className="geo-metric-label">Top 3 Rate</span>
+                                        </div>
+                                        <div className="geo-metric-item agnostic-item">
+                                            <span className="geo-metric-value">{state.geoMetrics.brand_agnostic_metrics.recommendation_rate?.toFixed(1)}%</span>
+                                            <span className="geo-metric-label">Recommend Rate</span>
+                                        </div>
+                                        <div className="geo-metric-item agnostic-item">
+                                            <span className="geo-metric-value">{state.geoMetrics.brand_agnostic_metrics.zero_mention_count}</span>
+                                            <span className="geo-metric-label">Zero Mentions</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {state.geoMetrics?.brand_features && state.geoMetrics.brand_features.length > 0 && (
+                                <div className="brand-features-section">
+                                    <p className="stat-label">Brand Features</p>
+                                    <div className="brand-features-tags">
+                                        {state.geoMetrics.brand_features.slice(0, 10).map((feature, idx) => (
+                                            <span key={idx} className="brand-feature-tag">{feature}</span>
+                                        ))}
+                                        {state.geoMetrics.brand_features.length > 10 && (
+                                            <span className="brand-feature-tag brand-feature-etc">...etc.</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                             <p className="score-note">
                                 Analyzing recommendations specific to {state.state || 'the region'}.
                             </p>
@@ -467,8 +560,18 @@ function DashboardPage() {
                                     Run All Questions
                                 </button>
                             )}
-                            {state.status === 'completed' && (
-                                <ExportButton results={state.results} filename={`${state.domain}_${state.state || 'local'}`} promptQuestionsId={state.promptQuestionsId} />
+                            {state.status === 'completed' && state.metricsChecked && !state.geoMetrics && (
+                                <button
+                                    onClick={handleCalculateMetrics}
+                                    disabled={state.isCalculatingMetrics}
+                                    className="btn-calculate-metrics"
+                                >
+                                    {state.isCalculatingMetrics ? <Loader2 size={16} className="animate-spin" /> : <Calculator size={16} />}
+                                    {state.isCalculatingMetrics ? 'Calculating...' : 'Calculate Metrics'}
+                                </button>
+                            )}
+                            {state.status === 'completed' && state.geoMetrics && (
+                                <ExportButton results={state.results} filename={`${state.domain}_${state.state || 'local'}`} geoMetrics={state.geoMetrics} />
                             )}
                         </div>
                     </div>
