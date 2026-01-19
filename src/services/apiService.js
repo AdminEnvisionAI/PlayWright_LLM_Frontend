@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://f912f79e3361.ngrok-free.app/api'
+const API_BASE_URL = 'https://5b7a5616e2d1.ngrok-free.app/api'
 
 export async function analyzeWebsite(domain, nation, state, queryContext = "", companyId = null, projectId = null) {
     const response = await fetch(`${API_BASE_URL}/analyze`, {

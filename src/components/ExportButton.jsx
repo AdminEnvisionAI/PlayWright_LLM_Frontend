@@ -216,7 +216,12 @@ export function ExportButton({ results, filename, geoMetrics }) {
                 ['#', 'Question', 'Answer Snippet', 'Category'],
             ]
 
-            if (brandAgnostic.zero_mention_prompts && brandAgnostic.zero_mention_prompts.length > 0) {
+            // Check if we have zero mention prompts from API, or use zero_mention_count with results
+            const hasZeroMentionPrompts = brandAgnostic.zero_mention_prompts && brandAgnostic.zero_mention_prompts.length > 0
+            const zeroMentionCount = brandAgnostic.zero_mention_count || 0
+
+            if (hasZeroMentionPrompts) {
+                // Use API provided zero_mention_prompts
                 brandAgnostic.zero_mention_prompts.forEach((p, idx) => {
                     zeroMentionData.push([
                         idx + 1,
@@ -225,6 +230,30 @@ export function ExportButton({ results, filename, geoMetrics }) {
                         p.category_name || ''
                     ])
                 })
+            } else if (zeroMentionCount > 0) {
+                // Fallback: Find brand agnostic prompts (questions WITHOUT brand name)
+                const brandName = metrics.brand_name || ''
+                const brandNameLower = brandName.toLowerCase()
+
+                // Filter prompts where question does NOT contain the brand name (brand agnostic prompts)
+                const brandAgnosticPrompts = results.filter(r => {
+                    const questionLower = (r.question || '').toLowerCase()
+                    return !questionLower.includes(brandNameLower)
+                })
+
+                if (brandAgnosticPrompts.length > 0) {
+                    brandAgnosticPrompts.forEach((r, idx) => {
+                        zeroMentionData.push([
+                            idx + 1,
+                            r.question || '',
+                            r.fullAnswer ? r.fullAnswer.substring(0, 150) + '...' : '',
+                            r.category || ''
+                        ])
+                    })
+                } else {
+                    // zero_mention_count > 0 but no brand agnostic prompts found
+                    zeroMentionData.push(['', `⚠ ${zeroMentionCount} brand agnostic prompts detected - details not available`, '', ''])
+                }
             } else {
                 zeroMentionData.push(['', '🎉 No zero mention prompts found - Brand is visible organically!', '', ''])
             }
