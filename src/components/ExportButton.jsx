@@ -56,8 +56,12 @@ export function ExportButton({ results, filename, geoMetrics, disabled = false }
 
         // Competitor Analysis
         const competitorCount = Object.keys(metrics.competitor_mentions || {}).length
+        const otherBrandsCount = Object.keys(metrics.other_brands_recommended || {}).length
+        if (otherBrandsCount > 0) {
+            conclusions.push(`🔍 AI Brand Recommendations: ${otherBrandsCount} other brands were recommended by AI in responses. Analyze these to understand your competitive landscape.`)
+        }
         if (competitorCount > 0) {
-            conclusions.push(`🔍 Competitive Landscape: ${competitorCount} competitors identified in AI responses. Analyze their strengths for improvement opportunities.`)
+            conclusions.push(`🔍 Competitive Landscape: ${competitorCount} predefined competitors identified in AI responses. Analyze their strengths for improvement opportunities.`)
         }
 
         // Brand Features (limited to first 10)
@@ -261,6 +265,9 @@ export function ExportButton({ results, filename, geoMetrics, disabled = false }
             // Start with API-provided competitors, then extract more from answers
             const competitorMentions = { ...(metrics.competitor_mentions || {}) }
 
+            // 🆕 Get other brands recommended by AI (from LLM analysis)
+            const otherBrandsRecommended = metrics.other_brands_recommended || {}
+
             // 🆕 Extract competitor brands from all answers (common restaurant/brand names)
             const knownCompetitors = [
                 'Olive Garden', 'Cheesecake Factory', 'P.F. Changs', 'Red Lobster', 'Outback',
@@ -283,10 +290,23 @@ export function ExportButton({ results, filename, geoMetrics, disabled = false }
             })
 
             const competitorEntries = Object.entries(competitorMentions).filter(([_, count]) => count > 0)
+            const otherBrandsEntries = Object.entries(otherBrandsRecommended).filter(([_, count]) => count > 0)
+
             const competitorData = [
                 ['COMPETITOR ANALYSIS'],
-                ['(Competitors mentioned in ChatGPT responses)'],
+                ['(Brands/Competitors mentioned and recommended in ChatGPT responses)'],
                 [''],
+                ['═══════════════════════════════════════════════════════════════'],
+                ['AI-RECOMMENDED BRANDS (detected from answers)'],
+                ['═══════════════════════════════════════════════════════════════'],
+                ['Brand Name', 'Times Recommended'],
+                ...(otherBrandsEntries.length > 0
+                    ? otherBrandsEntries.sort((a, b) => b[1] - a[1]).map(([name, count]) => [name, count])
+                    : [['No other brands recommended in AI responses', '']]),
+                [''],
+                ['═══════════════════════════════════════════════════════════════'],
+                ['PREDEFINED COMPETITORS (tracked mentions)'],
+                ['═══════════════════════════════════════════════════════════════'],
                 ['Competitor', 'Mention Count'],
                 ...(competitorEntries.length > 0
                     ? competitorEntries.sort((a, b) => b[1] - a[1]).map(([name, count]) => [name, count])
