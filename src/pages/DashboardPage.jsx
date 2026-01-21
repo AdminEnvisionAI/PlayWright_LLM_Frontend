@@ -25,6 +25,7 @@ function DashboardPage() {
         geoMetrics: null,
         metricsChecked: false,
         isCalculatingMetrics: false,
+        metricsDate: null,  // 🆕 Last calculated date from createdAt
     })
 
     useEffect(() => {
@@ -116,7 +117,9 @@ function DashboardPage() {
                     // Check if metrics data exists (has brand_name or total_prompts)
                     if (generatedMetrics && (generatedMetrics.brand_name || generatedMetrics.total_prompts)) {
                         console.log('Using pre-generated metrics')
-                        setState(prev => ({ ...prev, geoMetrics: generatedMetrics, metricsChecked: true }))
+                        // 🆕 Extract createdAt date
+                        const metricsDate = generatedMetrics.createdAt ? new Date(generatedMetrics.createdAt) : null
+                        setState(prev => ({ ...prev, geoMetrics: generatedMetrics, metricsChecked: true, metricsDate }))
                     } else {
                         // No pre-generated metrics, user needs to click Calculate button
                         console.log('No pre-generated metrics found')
@@ -139,7 +142,9 @@ function DashboardPage() {
 
         try {
             const calculatedMetrics = await calculateGeoMetrics(state.promptQuestionsId)
-            setState(prev => ({ ...prev, geoMetrics: calculatedMetrics, isCalculatingMetrics: false }))
+            // 🆕 Parse createdAt from response (new entry created on every recalculate)
+            const metricsDate = calculatedMetrics.createdAt ? new Date(calculatedMetrics.createdAt) : new Date()
+            setState(prev => ({ ...prev, geoMetrics: calculatedMetrics, isCalculatingMetrics: false, metricsDate }))
         } catch (err) {
             console.error('Failed to calculate geo metrics:', err)
             setState(prev => ({ ...prev, isCalculatingMetrics: false }))
@@ -560,18 +565,31 @@ function DashboardPage() {
                                     Run All Questions
                                 </button>
                             )}
-                            {state.status === 'completed' && state.metricsChecked && !state.geoMetrics && (
+                            {/* 🆕 Calculate Metrics always visible when completed (left side) */}
+                            {state.status === 'completed' && state.metricsChecked && (
                                 <button
                                     onClick={handleCalculateMetrics}
                                     disabled={state.isCalculatingMetrics}
                                     className="btn-calculate-metrics"
                                 >
                                     {state.isCalculatingMetrics ? <Loader2 size={16} className="animate-spin" /> : <Calculator size={16} />}
-                                    {state.isCalculatingMetrics ? 'Calculating...' : 'Calculate Metrics'}
+                                    {state.isCalculatingMetrics ? 'Calculating...' : state.geoMetrics ? 'Recalculate Metrics' : 'Calculate Metrics'}
                                 </button>
                             )}
-                            {state.status === 'completed' && state.geoMetrics && (
-                                <ExportButton results={state.results} filename={`${state.domain}_${state.state || 'local'}`} geoMetrics={state.geoMetrics} />
+                            {/* 🆕 Last calculated date display */}
+                            {state.metricsDate && (
+                                <span className="metrics-date">
+                                    Last: {state.metricsDate.toLocaleDateString()} {state.metricsDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            )}
+                            {/* 🆕 Export disabled until geoMetrics exists */}
+                            {state.status === 'completed' && (
+                                <ExportButton
+                                    results={state.results}
+                                    filename={`${state.domain}_${state.state || 'local'}`}
+                                    geoMetrics={state.geoMetrics}
+                                    disabled={!state.geoMetrics}
+                                />
                             )}
                         </div>
                     </div>

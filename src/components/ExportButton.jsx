@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import * as XLSX from 'xlsx'
 import { Download, Loader2 } from 'lucide-react'
 
-export function ExportButton({ results, filename, geoMetrics }) {
+export function ExportButton({ results, filename, geoMetrics, disabled = false }) {
     const [isExporting, setIsExporting] = useState(false)
 
     const generateConclusions = (metrics) => {
@@ -156,6 +156,29 @@ export function ExportButton({ results, filename, geoMetrics }) {
             ]
             XLSX.utils.book_append_sheet(workbook, promptTrackingSheet, 'AEO_GEO_Prompt_Tracking')
 
+            // 🆕 Calculate Brand Agnostic & Zero Mention prompts FIRST (before summary)
+            const brandName = metrics.brand_name || ''
+            const brandNameLower = brandName.toLowerCase()
+
+            // 🆕 Only include prompts that have answers
+            const answeredPrompts = results.filter(r => r.fullAnswer && r.fullAnswer.trim() !== '')
+
+            // Brand agnostic = answered questions WITHOUT brand name in question
+            const brandAgnosticPrompts = answeredPrompts.filter(r => {
+                const questionLower = (r.question || '').toLowerCase()
+                return !questionLower.includes(brandNameLower)
+            })
+
+            // Zero mention = brand agnostic where brand NOT found in answer
+            const zeroMentionPrompts = brandAgnosticPrompts.filter(r => {
+                const answerLower = (r.fullAnswer || '').toLowerCase()
+                return !answerLower.includes(brandNameLower)
+            })
+
+            // 🆕 Use calculated counts (ensures sheet matches summary)
+            const calculatedBrandAgnosticTotal = brandAgnosticPrompts.length
+            const calculatedZeroMentionCount = zeroMentionPrompts.length
+
             // Sheet 2: Executive Summary - Brand Info + Brand Agnostic Metrics + Features
             const brandAgnostic = metrics.brand_agnostic_metrics || {}
             const brandIncluded = metrics.brand_included_metrics || {}
@@ -165,7 +188,7 @@ export function ExportButton({ results, filename, geoMetrics }) {
                 ['BRAND INFORMATION'],
                 ['Brand Name', metrics.brand_name || ''],
                 ['Total Prompts (Overall)', metrics.total_prompts || 0],
-                ['Total Prompts (Brand Agnostic)', brandAgnostic.total_prompts || 0],
+                ['Total Prompts (Brand Agnostic)', calculatedBrandAgnosticTotal],
                 ['Report Generated', new Date().toLocaleString()],
                 [''],
                 ['═══════════════════════════════════════════════════════════════'],
@@ -173,13 +196,13 @@ export function ExportButton({ results, filename, geoMetrics }) {
                 ['═══════════════════════════════════════════════════════════════'],
                 [''],
                 ['Metric', 'Value', 'Status'],
-                ['Total Prompts', brandAgnostic.total_prompts || 0, 'Baseline'],
+                ['Total Prompts', calculatedBrandAgnosticTotal, 'Baseline'],
                 ['Mentions', brandAgnostic.mentions || 0, brandAgnostic.mentions > 0 ? '✓ Found' : '✗ Not Found'],
                 ['Brand Mention Rate', `${brandAgnostic.brand_mention_rate || 0}%`, brandAgnostic.brand_mention_rate >= 50 ? '✓ Excellent' : brandAgnostic.brand_mention_rate > 0 ? '⚠ Moderate' : '✗ Not Visible'],
                 ['Top 3 Mentions', brandAgnostic.top_3_mentions || 0, brandAgnostic.top_3_mentions > 0 ? '✓ Good' : '✗ Not in Top 3'],
                 ['Top 3 Position Rate', `${brandAgnostic.top_3_position_rate || 0}%`, brandAgnostic.top_3_position_rate >= 50 ? '✓ Excellent' : '⚠ Needs Improvement'],
                 ['Recommendation Rate', `${brandAgnostic.recommendation_rate || 0}%`, brandAgnostic.recommendation_rate >= 50 ? '✓ Good' : '⚠ Low'],
-                ['Zero Mention Count', brandAgnostic.zero_mention_count || 0, brandAgnostic.zero_mention_count === 0 ? '✓ Perfect' : `⚠ ${brandAgnostic.zero_mention_count} Opportunities`],
+                ['Zero Mention Count', calculatedZeroMentionCount, calculatedZeroMentionCount === 0 ? '✓ Perfect' : `⚠ ${calculatedZeroMentionCount} Opportunities`],
                 ['Citations Expected', brandAgnostic.citations_expected || 0, ''],
                 ['First Party Citations', brandAgnostic.first_party_citations || 0, ''],
                 ['First Party Citation Rate', `${brandAgnostic.first_party_citation_rate || 0}%`, ''],
@@ -208,7 +231,7 @@ export function ExportButton({ results, filename, geoMetrics }) {
             summarySheet['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 25 }]
             XLSX.utils.book_append_sheet(workbook, summarySheet, 'Executive Summary')
 
-            // Sheet 3: Zero Mention Prompts (Brand Agnostic - Opportunities)
+            // Sheet 3: Zero Mention Prompts (Brand Agnostic - where brand NOT mentioned in answer)
             const zeroMentionData = [
                 ['IMPROVEMENT OPPORTUNITIES'],
                 ['(Brand Agnostic Prompts - where brand was NOT mentioned organically)'],
@@ -216,56 +239,53 @@ export function ExportButton({ results, filename, geoMetrics }) {
                 ['#', 'Question', 'Answer Snippet', 'Category'],
             ]
 
-            // Check if we have zero mention prompts from API, or use zero_mention_count with results
-            const hasZeroMentionPrompts = brandAgnostic.zero_mention_prompts && brandAgnostic.zero_mention_prompts.length > 0
-            const zeroMentionCount = brandAgnostic.zero_mention_count || 0
-
-            if (hasZeroMentionPrompts) {
-                // Use API provided zero_mention_prompts
-                brandAgnostic.zero_mention_prompts.forEach((p, idx) => {
+            // 🆕 Use already computed zeroMentionPrompts (matches summary count)
+            if (zeroMentionPrompts.length > 0) {
+                zeroMentionPrompts.forEach((r, idx) => {
                     zeroMentionData.push([
                         idx + 1,
-                        p.question || '',
-                        p.answer_snippet || '',
-                        p.category_name || ''
+                        r.question || '',
+                        r.fullAnswer ? r.fullAnswer.substring(0, 150) + '...' : '',
+                        r.category || ''
                     ])
                 })
-            } else if (zeroMentionCount > 0) {
-                // Fallback: Find brand agnostic prompts (questions WITHOUT brand name)
-                const brandName = metrics.brand_name || ''
-                const brandNameLower = brandName.toLowerCase()
-
-                // Filter prompts where question does NOT contain the brand name (brand agnostic prompts)
-                const brandAgnosticPrompts = results.filter(r => {
-                    const questionLower = (r.question || '').toLowerCase()
-                    return !questionLower.includes(brandNameLower)
-                })
-
-                if (brandAgnosticPrompts.length > 0) {
-                    brandAgnosticPrompts.forEach((r, idx) => {
-                        zeroMentionData.push([
-                            idx + 1,
-                            r.question || '',
-                            r.fullAnswer ? r.fullAnswer.substring(0, 150) + '...' : '',
-                            r.category || ''
-                        ])
-                    })
-                } else {
-                    // zero_mention_count > 0 but no brand agnostic prompts found
-                    zeroMentionData.push(['', `⚠ ${zeroMentionCount} brand agnostic prompts detected - details not available`, '', ''])
-                }
             } else {
-                zeroMentionData.push(['', '🎉 No zero mention prompts found - Brand is visible organically!', '', ''])
+                zeroMentionData.push(['', '🎉 No zero mention prompts found - Brand is visible organically in all responses!', '', ''])
             }
 
             const zeroMentionSheet = XLSX.utils.aoa_to_sheet(zeroMentionData)
             zeroMentionSheet['!cols'] = [{ wch: 5 }, { wch: 60 }, { wch: 80 }, { wch: 20 }]
             XLSX.utils.book_append_sheet(workbook, zeroMentionSheet, 'Zero Mention Prompts')
 
-            // Sheet 4: Competitor Analysis
-            const competitorEntries = Object.entries(metrics.competitor_mentions || {})
+            // Sheet 4: Competitor Analysis - 🆕 Extract competitors from all answers
+            // Start with API-provided competitors, then extract more from answers
+            const competitorMentions = { ...(metrics.competitor_mentions || {}) }
+
+            // 🆕 Extract competitor brands from all answers (common restaurant/brand names)
+            const knownCompetitors = [
+                'Olive Garden', 'Cheesecake Factory', 'P.F. Changs', 'Red Lobster', 'Outback',
+                'Applebees', 'Chilis', 'TGI Fridays', 'Buffalo Wild Wings', 'Dennys',
+                'IHOP', 'Cracker Barrel', 'Texas Roadhouse', 'LongHorn', 'Ruth Chris',
+                'Morton', 'Capital Grille', 'Nobu', 'Benihana', 'Maggianos',
+                // Add more as needed or get from metrics.competitors
+            ]
+            const apiCompetitors = metrics.competitors || []
+            const allCompetitors = [...new Set([...apiCompetitors, ...knownCompetitors])]
+
+            // Scan all answers for competitor mentions
+            results.forEach(r => {
+                const answerLower = (r.fullAnswer || '').toLowerCase()
+                allCompetitors.forEach(comp => {
+                    if (comp && answerLower.includes(comp.toLowerCase())) {
+                        competitorMentions[comp] = (competitorMentions[comp] || 0) + 1
+                    }
+                })
+            })
+
+            const competitorEntries = Object.entries(competitorMentions).filter(([_, count]) => count > 0)
             const competitorData = [
                 ['COMPETITOR ANALYSIS'],
+                ['(Competitors mentioned in ChatGPT responses)'],
                 [''],
                 ['Competitor', 'Mention Count'],
                 ...(competitorEntries.length > 0
@@ -293,16 +313,15 @@ export function ExportButton({ results, filename, geoMetrics }) {
                 qnaData.push([`📂 ${category.toUpperCase()}`])
                 qnaData.push([`Found: ${foundCount}/${totalCount} (${foundRate}%)`, '', '', foundRate >= 50 ? '✅ Good' : foundRate > 0 ? '⚠️ Needs Improvement' : '❌ Not Visible'])
                 qnaData.push([''])
-                qnaData.push(['#', 'Question', 'ChatGPT Answer', 'Brand Found', 'Status'])
+                qnaData.push(['#', 'Question', 'ChatGPT Answer', 'Brand Found'])
 
-                // Add each Q&A in this category
+                // Add each Q&A in this category (🆕 Removed duplicate Status column)
                 items.forEach((r, idx) => {
                     qnaData.push([
                         idx + 1,
                         r.question,
                         r.fullAnswer || '(Not answered yet)',
-                        r.found ? 'YES ✓' : 'NO ✗',
-                        r.found ? '✅ Visible' : '❌ Not Found'
+                        r.found ? 'YES ✓' : 'NO ✗'
                     ])
                 })
             })
@@ -322,7 +341,7 @@ export function ExportButton({ results, filename, geoMetrics }) {
             qnaData.push(['Performance', overallRate >= 70 ? '🏆 Excellent' : overallRate >= 50 ? '✅ Good' : overallRate >= 25 ? '⚠️ Needs Work' : '❌ Critical - Immediate Action Required'])
 
             const qnaSheet = XLSX.utils.aoa_to_sheet(qnaData)
-            qnaSheet['!cols'] = [{ wch: 5 }, { wch: 60 }, { wch: 100 }, { wch: 15 }, { wch: 18 }]
+            qnaSheet['!cols'] = [{ wch: 5 }, { wch: 60 }, { wch: 100 }, { wch: 15 }]  // 🆕 Removed Status column width
             XLSX.utils.book_append_sheet(workbook, qnaSheet, 'All Q&A Data')
 
             // Download the workbook
@@ -339,7 +358,7 @@ export function ExportButton({ results, filename, geoMetrics }) {
         <button
             onClick={handleExport}
             className="btn-export"
-            disabled={results.length === 0 || isExporting}
+            disabled={disabled || results.length === 0 || isExporting || !geoMetrics}
         >
             {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             {isExporting ? 'Generating Report...' : 'Export to Excel (.xlsx)'}
