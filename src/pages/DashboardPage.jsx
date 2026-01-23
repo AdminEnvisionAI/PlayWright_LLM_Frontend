@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Category } from '../constants.js'
-import { analyzeWebsite, generateQuestions, askChatGPT, getProjectById, getCompanyById, getPromptQuestionsData, getAllCategories, getGeneratedMetrics, calculateGeoMetrics } from '../services/apiService.js'
+import { analyzeWebsite, generateQuestions, askChatGPT, askGemini, getProjectById, getCompanyById, getPromptQuestionsData, getAllCategories, getGeneratedMetrics, calculateGeoMetrics } from '../services/apiService.js'
 import { ResultsTable } from '../components/ResultsTable.jsx'
 import { ExportButton } from '../components/ExportButton.jsx'
 import { Search, Globe, ShieldCheck, Loader2, AlertCircle, BarChart3, Target, LayoutDashboard, MapPin, Flag, ExternalLink, ChevronRight, Play, Plus, Calculator } from 'lucide-react'
@@ -25,8 +25,9 @@ function DashboardPage() {
         geoMetrics: null,
         metricsChecked: false,
         isCalculatingMetrics: false,
-        metricsDate: null,  // 🆕 Last calculated date from createdAt
+        metricsDate: null,
     })
+    const [selectedAI, setSelectedAI] = useState('chatgpt') // 'chatgpt' or 'gemini'
 
     useEffect(() => {
         loadProjectData()
@@ -190,7 +191,7 @@ function DashboardPage() {
         }))
     }
 
-    const handleRunSingleQuestion = async (id) => {
+    const handleRunSingleQuestion = async (id, aiType = 'chatgpt') => {
         const resultToRun = state.results.find(r => r.id === id)
         if (!resultToRun || !state.analysis) return
 
@@ -198,9 +199,10 @@ function DashboardPage() {
             ...prev,
             results: prev.results.map(r => r.id === id ? { ...r, loading: true } : r)
         }))
-        console.log("resultToRun--->", resultToRun)
+        console.log("resultToRun--->", resultToRun, "AI:", aiType)
         try {
-            const answer = await askChatGPT(resultToRun.question, state.nation, state.state || 'across country', state.promptQuestionsId, resultToRun.categoryId, resultToRun.uuid)
+            const askFunction = aiType === 'gemini' ? askGemini : askChatGPT
+            const answer = await askFunction(resultToRun.question, state.nation, state.state || 'across country', state.promptQuestionsId, resultToRun.categoryId, resultToRun.uuid)
             const brandLower = state.analysis.brandName.toLowerCase()
             const domainLower = state.domain.toLowerCase()
             const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
@@ -242,7 +244,8 @@ function DashboardPage() {
             }))
 
             try {
-                const answer = await askChatGPT(result.question, state.nation, locationState, state.promptQuestionsId, result.categoryId, result.uuid)
+                const askFunction = selectedAI === 'gemini' ? askGemini : askChatGPT
+                const answer = await askFunction(result.question, state.nation, locationState, state.promptQuestionsId, result.categoryId, result.uuid)
                 const found = answer.toLowerCase().includes(brandLower) || answer.toLowerCase().includes(domainLower)
 
                 setState(prev => ({
@@ -556,14 +559,25 @@ function DashboardPage() {
                         </div>
                         <div className="results-actions">
                             {(state.status === 'questions_ready' || state.status === 'completed' || state.status === 'evaluating') && hasUnansweredQuestions && (
-                                <button
-                                    onClick={handleRunAllQuestions}
-                                    disabled={isAnyLoading}
-                                    className="btn-run-all"
-                                >
-                                    {isAnyLoading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
-                                    Run All Questions
-                                </button>
+                                <>
+                                    <select
+                                        value={selectedAI}
+                                        onChange={(e) => setSelectedAI(e.target.value)}
+                                        className="ai-select"
+                                        disabled={isAnyLoading}
+                                    >
+                                        <option value="chatgpt">ChatGPT</option>
+                                        <option value="gemini">Gemini</option>
+                                    </select>
+                                    <button
+                                        onClick={handleRunAllQuestions}
+                                        disabled={isAnyLoading}
+                                        className="btn-run-all"
+                                    >
+                                        {isAnyLoading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
+                                        Run All Questions
+                                    </button>
+                                </>
                             )}
                             {/* 🆕 Calculate Metrics always visible when completed (left side) */}
                             {state.status === 'completed' && state.metricsChecked && (

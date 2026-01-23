@@ -65,6 +65,7 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
     const [showAddForm, setShowAddForm] = useState(false)
     const [newQuestion, setNewQuestion] = useState("")
     const [selectedCategoryId, setSelectedCategoryId] = useState("")
+    const [rowAISelection, setRowAISelection] = useState({}) // Per-row AI selection
 
     const startEditing = (id, currentText) => {
         setEditingId(id)
@@ -154,7 +155,7 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
                                     {result.loading ? (
                                         <div className="loading-answer animate-pulse">
                                             <Loader2 size={16} className="animate-spin" />
-                                            <span>ChatGPT is thinking...</span>
+                                            <span>Selected LLM is thinking...</span>
                                         </div>
                                     ) : result.fullAnswer ? (
                                         <HighlightedText text={result.fullAnswer} targetTerms={targetTerms} />
@@ -198,8 +199,17 @@ export function ResultsTable({ results, brandName, domain, onUpdateQuestion, onR
                                     >
                                         <Edit2 size={18} />
                                     </button>
+                                    <select
+                                        value={rowAISelection[result.id] || 'chatgpt'}
+                                        onChange={(e) => setRowAISelection(prev => ({ ...prev, [result.id]: e.target.value }))}
+                                        className="ai-select-row"
+                                        disabled={result.loading}
+                                    >
+                                        <option value="chatgpt">GPT</option>
+                                        <option value="gemini">Gemini</option>
+                                    </select>
                                     <button
-                                        onClick={() => onRunSingleQuestion && onRunSingleQuestion(result.id)}
+                                        onClick={() => onRunSingleQuestion && onRunSingleQuestion(result.id, rowAISelection[result.id] || 'chatgpt')}
                                         className="action-btn play"
                                         title="Run Question"
                                         disabled={result.loading || !brandName}

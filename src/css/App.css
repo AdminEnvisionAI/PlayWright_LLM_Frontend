@@ -951,3 +951,72 @@ body {
     text-align: center;
     font-size: 0.85rem;
 }
+
+/* --- AI Select Dropdown --- */
+.ai-select {
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    color: var(--text-main);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+    min-width: 120px;
+}
+
+.ai-select:hover:not(:disabled) {
+    border-color: var(--primary-glow);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+.ai-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.ai-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ai-select option {
+    background: var(--bg-dark);
+    color: var(--text-main);
+    padding: 0.5rem;
+}
+
+/* Per-row AI select (smaller) */
+.ai-select-row {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    color: var(--text-main);
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+    min-width: 70px;
+}
+
+.ai-select-row:hover:not(:disabled) {
+    border-color: var(--primary-glow);
+}
+
+.ai-select-row:focus {
+    border-color: var(--primary);
+}
+
+.ai-select-row:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ai-select-row option {
+    background: var(--bg-dark);
+    color: var(--text-main);
+}
